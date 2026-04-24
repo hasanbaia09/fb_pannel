@@ -12,8 +12,8 @@ app.listen(3000, () => {
 const TelegramBot = require('node-telegram-bot-api');
 
 // ============= কনফিগারেশন =============
-const BOT_TOKEN = 'YOUR_BOT_TOKEN_HERE';  //8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U
-const MASTER_ADMIN_ID = 'YOUR_TELEGRAM_ID'; // 7659779887
+const BOT_TOKEN = 8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U
+const MASTER_ADMIN_ID = 7659779887
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
