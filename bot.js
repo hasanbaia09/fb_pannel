@@ -12,7 +12,7 @@ app.listen(3000, () => {
 const TelegramBot = require('node-telegram-bot-api');
 
 // ============= কনফিগারেশন =============
-const BOT_TOKEN = '8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U';
+const BOT_TOKEN = '8653224028:AAFDVa2HvC778pNmr369EYl4pGcHLdM5Z3Q';
 const SUPER_ADMIN_ID = '7659779887';
 const BKASH_NUMBER = '01865598733';
 const PER_REQUEST_COST = 2;
