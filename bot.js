@@ -11,9 +11,9 @@ app.listen(3000, () => {
 
 const TelegramBot = require('node-telegram-bot-api');
 
-// ============= কনফিগারেশন =============
-const BOT_TOKEN = 8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U
-const SUPER_ADMIN_ID = 7659779887
+// ============= কনফিগারেশন (তোমার তথ্য বসানো হয়েছে) =============
+const BOT_TOKEN = '8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U';
+const SUPER_ADMIN_ID = '7659779887';
 const BKASH_NUMBER = '01865598733';
 const PER_REQUEST_COST = 2;
 const REFERRAL_BONUS = 10;
@@ -58,7 +58,7 @@ async function sendFriendRequest(cookie, proxy, targetId) {
     params.append('__a', '1');
     
     try {
-        let fetchOptions = {
+        const fetchOptions = {
             method: 'POST',
             headers: {
                 'Cookie': cookie,
@@ -67,10 +67,6 @@ async function sendFriendRequest(cookie, proxy, targetId) {
             },
             body: params.toString()
         };
-        
-        if (proxy && proxy !== 'none') {
-            fetchOptions.agent = new (require('https-proxy-agent'))(proxy);
-        }
         
         const response = await fetch(url, fetchOptions);
         const text = await response.text();
@@ -126,18 +122,17 @@ function getUserVisibleAccounts(userId) {
     return fbAccounts.slice(0, visibleCount);
 }
 
-// ============= মেনু বাটন (ছবির মতো) =============
+// ============= মেনু বাটন =============
 const mainMenu = {
     reply_markup: {
         inline_keyboard: [
-            [{ text: "💰 ট্রান্সফার ব্যালেন্স", callback_data: "transfer_balance" }],
-            [{ text: "📦 নিউ স্টক এডেড", callback_data: "new_stock" }],
-            [{ text: "🛍️ শপ নাউ", callback_data: "shop_now" }],
-            [{ text: "💸 ডিপোজিট", callback_data: "deposit" }],
+            [{ text: "📝 লিংক যোগ করুন", callback_data: "add_link" }],
+            [{ text: "🚀 রিকোয়েস্ট পাঠান", callback_data: "send_req" }],
             [{ text: "👤 প্রোফাইল", callback_data: "profile" }],
+            [{ text: "💸 ডিপোজিট", callback_data: "deposit" }],
             [{ text: "🔗 রেফার", callback_data: "referral" }],
-            [{ text: "🛎️ সাপোর্ট", callback_data: "support" }],
-            [{ text: "💬 মেসেজ", callback_data: "message_admin" }]
+            [{ text: "📊 স্ট্যাটাস", callback_data: "user_status" }],
+            [{ text: "🛎️ সাপোর্ট", callback_data: "support" }]
         ]
     }
 };
@@ -148,7 +143,6 @@ const adminMenu = {
             [{ text: "👥 ইউজার ম্যানেজমেন্ট", callback_data: "admin_user_section" }],
             [{ text: "📘 FB অ্যাকাউন্ট ম্যানেজ", callback_data: "admin_fb_section" }],
             [{ text: "💰 পেমেন্ট ম্যানেজ", callback_data: "admin_payment_section" }],
-            [{ text: "🔄 প্রোক্সি ম্যানেজ", callback_data: "admin_proxy_section" }],
             [{ text: "📊 অ্যানালিটিক্স", callback_data: "admin_analytics" }],
             [{ text: "⚙️ সেটিংস", callback_data: "admin_settings" }],
             [{ text: "🔙 হোম", callback_data: "main_menu" }]
@@ -159,9 +153,7 @@ const adminMenu = {
 function backButton(data) {
     return {
         reply_markup: {
-            inline_keyboard: [
-                [{ text: "🔙 ব্যাক", callback_data: data }]
-            ]
+            inline_keyboard: [[{ text: "🔙 ব্যাক", callback_data: data }]]
         }
     };
 }
@@ -173,7 +165,6 @@ bot.onText(/\/start/, async (msg) => {
     const firstName = msg.from.first_name || "ভাই";
     const username = msg.from.username || "N/A";
     
-    // রেফারাল চেক
     const text = msg.text;
     const refMatch = text.match(/ref_(\d+)/);
     if (refMatch && !allowedUsers[userId]) {
@@ -242,7 +233,8 @@ bot.onText(/\/approve_(\d+)/, async (msg, match) => {
         blocked: false,
         approvedAt: new Date().toLocaleString(),
         visibleCount: 30,
-        link: null
+        link: null,
+        username: pending.username
     };
     
     userBalance[userId] = 0;
@@ -277,7 +269,10 @@ bot.on('callback_query', async (query) => {
     
     // প্রোফাইল
     else if (data === 'profile') {
-        if (!isAllowed(userId)) return;
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
         const balance = userBalance[userId] || 0;
         const stats = userStats[userId] || {};
         const history = userHistory[userId] || [];
@@ -301,7 +296,10 @@ bot.on('callback_query', async (query) => {
     
     // ডিপোজিট
     else if (data === 'deposit') {
-        if (!isAllowed(userId)) return;
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
         bot.editMessageText(
             `💸 **ডিপোজিট** 💸\n\n` +
             `bKash নাম্বার: ${BKASH_NUMBER}\n` +
@@ -331,18 +329,21 @@ bot.on('callback_query', async (query) => {
                     bot.sendMessage(chatId, `❌ ন্যূনতম ডিপোজিট ${MIN_DEPOSIT} টাকা!`);
                 }
             } else {
-                bot.sendMessage(chatId, "❌ ভুল ফরম্যাট!");
+                bot.sendMessage(chatId, "❌ ভুল ফরম্যাট! টাকা|TXID দিন।");
             }
         });
     }
     
     // রেফারাল
     else if (data === 'referral') {
-        if (!isAllowed(userId)) return;
-        const referralLink = getReferralLink(userId);
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
+        const username = msg.from.username || "hasanbaia9";
+        const referralLink = `https://t.me/fbfhelppanel_bot?start=ref_${userId}`;
         const referralCount = userStats[userId]?.referralCount || 0;
         
-        // লিডারবোর্ড তৈরি
         let leaderboard = "🏆 **লিডারবোর্ড** 🏆\n\n";
         const sorted = Object.entries(userStats)
             .sort((a, b) => (b[1].referralCount || 0) - (a[1].referralCount || 0))
@@ -355,10 +356,10 @@ bot.on('callback_query', async (query) => {
         
         bot.editMessageText(
             `🔗 **রেফার লিংক** 🔗\n\n` +
-            `আপনার লিংক: ${referralLink}\n` +
-            `আপনি এনেছেন: ${referralCount} জন\n\n` +
-            `${leaderboard}\n` +
-            `প্রতি রেফারালে বোনাস: ${REFERRAL_BONUS} টাকা`,
+            `🔗 লিংক: ${referralLink}\n` +
+            `👥 রেফারাল কাউন্ট: ${referralCount} জন\n` +
+            `💰 প্রতি রেফারালে বোনাস: ${REFERRAL_BONUS} টাকা\n\n` +
+            `${leaderboard}`,
             { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
         );
     }
@@ -367,56 +368,61 @@ bot.on('callback_query', async (query) => {
     else if (data === 'support') {
         bot.editMessageText(
             "🛎️ **সাপোর্ট** 🛎️\n\n" +
-            "কোনো সমস্যা হলে অ্যাডমিনকে জানান:\n\n" +
-            "📞 অ্যাডমিন: @fbfhelppanel_bot\n\n" +
-            "আমরা ২৪/৭ সাপোর্ট দেই।",
+            "📞 **অ্যাডমিন:** @hasanbaia9\n\n" +
+            "⏰ অনলাইন: ২৪/৭\n\n" +
+            "কোনো সমস্যা হলে যোগাযোগ করুন।",
             { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
         );
-    }
-    
-    // মেসেজ অ্যাডমিন
-    else if (data === 'message_admin') {
-        bot.editMessageText(
-            "💬 **অ্যাডমিনকে মেসেজ পাঠান** 💬\n\n" +
-            "আপনার মেসেজ লিখুন। অ্যাডমিন উত্তর দিবেন।",
-            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
-        );
-        
-        bot.once('message', async (msg) => {
-            if (msg.chat.id !== chatId) return;
-            const userMsg = msg.text;
-            for (const [uid, data] of Object.entries(allowedUsers)) {
-                if (data.isAdmin === true || uid === SUPER_ADMIN_ID) {
-                    bot.sendMessage(uid, `💬 নতুন মেসেজ\n👤 ${allowedUsers[userId]?.name}\n📝 ${userMsg}\n/reply_${userId} দিয়ে উত্তর দিন`);
-                }
-            }
-            bot.sendMessage(chatId, "✅ আপনার মেসেজ অ্যাডমিনের কাছে পাঠানো হয়েছে।", { reply_markup: mainMenu.reply_markup });
-        });
     }
     
     // লিংক যোগ করা
     else if (data === 'add_link') {
-        if (!isAllowed(userId)) return;
-        bot.editMessageText("🔗 ফেসবুক লিংক দিন:", { chat_id: chatId, message_id: messageId });
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
+        bot.editMessageText("🔗 ফেসবুক প্রোফাইল লিংক দিন:\n\nউদাহরণ: `https://facebook.com/username`", { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' });
         bot.once('message', (msg) => {
             userLinks[userId] = msg.text;
             bot.sendMessage(chatId, "✅ লিংক সেভ হয়েছে!", { reply_markup: mainMenu.reply_markup });
         });
     }
     
+    // স্ট্যাটাস
+    else if (data === 'user_status') {
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
+        const visibleAccounts = getUserVisibleAccounts(userId);
+        const balance = userBalance[userId] || 0;
+        bot.editMessageText(
+            `📊 **স্ট্যাটাস** 📊\n\n` +
+            `✅ স্ট্যাটাস: অনুমোদিত\n` +
+            `📘 অ্যাকাউন্ট: ${visibleAccounts.length}/${fbAccounts.length}টি\n` +
+            `💰 ব্যালেন্স: ${balance} টাকা\n` +
+            `⏱️ ডেলি টাইম: ৪-৭ সেকেন্ড\n` +
+            `💰 প্রতি রিকোয়েস্ট খরচ: ${PER_REQUEST_COST} টাকা`,
+            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
+        );
+    }
+    
     // রিকোয়েস্ট পাঠানো
     else if (data === 'send_req') {
-        if (!isAllowed(userId)) return;
+        if (!isAllowed(userId)) {
+            bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
+            return;
+        }
         
         const link = userLinks[userId];
         if (!link) {
-            bot.answerCallbackQuery(query.id, { text: '❌ আগে লিংক দাও!', show_alert: true });
+            bot.answerCallbackQuery(query.id, { text: '❌ আগে লিংক যোগ করুন!', show_alert: true });
             return;
         }
         
         const balance = userBalance[userId] || 0;
         if (balance < PER_REQUEST_COST) {
-            bot.answerCallbackQuery(query.id, { text: `❌ ব্যালেন্স কম! ${PER_REQUEST_COST} টাকা দরকার। ডিপোজিট করো।`, show_alert: true });
+            bot.answerCallbackQuery(query.id, { text: `❌ ব্যালেন্স কম! ${PER_REQUEST_COST} টাকা দরকার। ডিপোজিট করুন।`, show_alert: true });
             return;
         }
         
@@ -430,19 +436,20 @@ bot.on('callback_query', async (query) => {
         const visibleAccounts = getUserVisibleAccounts(userId);
         
         userBalance[userId] = balance - PER_REQUEST_COST;
+        if (!userStats[userId]) userStats[userId] = { totalSpent: 0, totalDeposits: 0, referralCount: 0 };
         userStats[userId].totalSpent = (userStats[userId].totalSpent || 0) + PER_REQUEST_COST;
+        if (!userHistory[userId]) userHistory[userId] = [];
         userHistory[userId].push({ type: "খরচ", amount: PER_REQUEST_COST, date: new Date().toLocaleString(), target: targetId });
         
         bot.editMessageText(
-            `🚀 রিকোয়েস্ট পাঠানো শুরু...\n📌 টার্গেট: ${targetId}\n📊 অ্যাকাউন্ট: ${visibleAccounts.length}টি\n💰 কাটা: ${PER_REQUEST_COST} টাকা\nবাকি: ${userBalance[userId]} টাকা`,
+            `🚀 রিকোয়েস্ট পাঠানো শুরু...\n📌 টার্গেট: ${targetId}\n📊 অ্যাকাউন্ট: ${visibleAccounts.length}টি\n💰 খরচ: ${PER_REQUEST_COST} টাকা\n💸 বাকি: ${userBalance[userId]} টাকা`,
             { chat_id: chatId, message_id: messageId }
         );
         
         let success = 0;
         for (let i = 0; i < visibleAccounts.length; i++) {
             const acc = visibleAccounts[i];
-            const proxy = blockedProxies.includes(acc.proxy) ? null : acc.proxy;
-            const result = await sendFriendRequest(acc.cookie, proxy, targetId);
+            const result = await sendFriendRequest(acc.cookie, acc.proxy, targetId);
             if (result) success++;
             bot.sendMessage(chatId, `${result ? '✅' : '❌'} ${acc.name}`);
             if (i < visibleAccounts.length - 1) await sleep(randomDelay());
@@ -460,7 +467,8 @@ bot.on('callback_query', async (query) => {
             "/pending - পেন্ডিং ইউজার\n" +
             "/approve_আইডি - অনুমোদন দাও\n" +
             "/block_আইডি - ব্লক করো\n" +
-            "/unblock_আইডি - আনব্লক করো",
+            "/unblock_আইডি - আনব্লক করো\n" +
+            "/make_admin আইডি - অ্যাডমিন বানাও",
             { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: adminMenu.reply_markup }
         );
     }
@@ -469,8 +477,7 @@ bot.on('callback_query', async (query) => {
         if (!isAdmin(userId)) return;
         bot.editMessageText(
             "📘 **FB অ্যাকাউন্ট ম্যানেজ**\n\n" +
-            "/add_fb আইডি|নাম|কুকি|প্রক্সি (প্রক্সি অপশনাল)\n" +
-            "/add_batch_fb (একসাথে ১০টি)\n" +
+            "/add_fb আইডি|নাম|কুকি\n" +
             "/list_fb - সব অ্যাকাউন্ট দেখো\n" +
             "/del_fb নাম্বার - অ্যাকাউন্ট ডিলিট\n" +
             "/set_visible আইডি|কাউন্ট - ইউজারের ভিজিবল সেট",
@@ -490,33 +497,19 @@ bot.on('callback_query', async (query) => {
         );
     }
     
-    else if (data === 'admin_proxy_section') {
-        if (!isAdmin(userId)) return;
-        bot.editMessageText(
-            "🔄 **প্রোক্সি ম্যানেজ**\n\n" +
-            "/add_proxy http://user:pass@ip:port\n" +
-            "/list_proxy - সব প্রোক্সি দেখো\n" +
-            "/del_proxy নাম্বার - প্রোক্সি ডিলিট\n" +
-            "/blocked_proxy - ব্লক প্রোক্সি দেখো",
-            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: adminMenu.reply_markup }
-        );
-    }
-    
     else if (data === 'admin_analytics') {
         if (!isAdmin(userId)) return;
         const totalUsers = Object.keys(allowedUsers).length;
         const totalIncome = Object.values(userStats).reduce((sum, s) => sum + (s.totalSpent || 0), 0);
         const totalDeposits = Object.values(userStats).reduce((sum, s) => sum + (s.totalDeposits || 0), 0);
-        const onlineCount = Object.keys(userLinks).length;
         
         bot.editMessageText(
             "📊 **অ্যানালিটিক্স** 📊\n\n" +
             `👥 মোট ইউজার: ${totalUsers}\n` +
-            `🟢 অনলাইন: ${onlineCount}\n` +
             `💰 মোট ইনকাম: ${totalIncome} টাকা\n` +
             `💵 মোট ডিপোজিট: ${totalDeposits} টাকা\n` +
             `📘 FB অ্যাকাউন্ট: ${fbAccounts.length}টি\n` +
-            `🔄 প্রোক্সি: ${proxyList.length}টি (${blockedProxies.length} ব্লক)`,
+            `⏳ পেন্ডিং ইউজার: ${pendingUsers.length}টি`,
             { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: adminMenu.reply_markup }
         );
     }
@@ -533,68 +526,6 @@ bot.on('callback_query', async (query) => {
         );
     }
     
-    // নিউ স্টক
-    else if (data === 'new_stock') {
-        bot.editMessageText(
-            "📦 **নিউ স্টক এডেড** 📦\n\n" +
-            "🔥 তাজা Facebook অ্যাকাউন্ট!\n" +
-            "📘 ৫০টি অ্যাকাউন্ট রেডি\n" +
-            "💰 দাম: ১০০ টাকা/পিস\n\n" +
-            "অর্ডার করতে /shop_now ব্যবহার করুন।",
-            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
-        );
-    }
-    
-    else if (data === 'shop_now') {
-        bot.editMessageText(
-            "🛍️ **শপ নাউ** 🛍️\n\n" +
-            "📘 Facebook অ্যাকাউন্ট (PDF ফাইল)\n" +
-            "• ৫০টি অ্যাকাউন্ট: ৫০ টাকা\n" +
-            "• ১০০টি অ্যাকাউন্ট: ৯০ টাকা\n" +
-            "• ২০০টি অ্যাকাউন্ট: ১৬০ টাকা\n\n" +
-            "বিকাশ: 01865598733\n" +
-            "পেমেন্টের পর স্ক্রিনশট দিন।",
-            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
-        );
-    }
-    
-    else if (data === 'transfer_balance') {
-        if (!isAllowed(userId)) return;
-        bot.editMessageText(
-            "💰 **ট্রান্সফার ব্যালেন্স** 💰\n\n" +
-            "ফরম্যাট: @ইউজারনেম টাকা\n" +
-            "উদাহরণ: @hasanbaia09 50",
-            { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', reply_markup: backButton("main_menu").reply_markup }
-        );
-        
-        bot.once('message', async (msg) => {
-            const parts = msg.text.split(' ');
-            if (parts.length === 2 && parts[0].startsWith('@')) {
-                const targetUsername = parts[0].substring(1);
-                const amount = parseInt(parts[1]);
-                let targetId = null;
-                
-                for (const [uid, user] of Object.entries(allowedUsers)) {
-                    if (user.username === targetUsername) {
-                        targetId = uid;
-                        break;
-                    }
-                }
-                
-                if (targetId && userBalance[userId] >= amount && amount > 0) {
-                    userBalance[userId] -= amount;
-                    userBalance[targetId] = (userBalance[targetId] || 0) + amount;
-                    bot.sendMessage(chatId, `✅ ট্রান্সফার সফল! ${amount} টাকা পাঠানো হয়েছে।`);
-                    bot.sendMessage(targetId, `💰 ${amount} টাকা পেয়েছেন ${allowedUsers[userId]?.name} থেকে।`);
-                } else {
-                    bot.sendMessage(chatId, "❌ ট্রান্সফার ব্যর্থ! ব্যালেন্স কম বা ইউজার নেই।");
-                }
-            } else {
-                bot.sendMessage(chatId, "❌ ভুল ফরম্যাট! @ইউজারনেম টাকা");
-            }
-        });
-    }
-    
     bot.answerCallbackQuery(query.id);
 });
 
@@ -603,7 +534,7 @@ bot.onText(/\/users/, (msg) => {
     if (!isAdmin(msg.chat.id)) return;
     let list = "👥 **ইউজার লিস্ট:**\n\n";
     for (const [uid, user] of Object.entries(allowedUsers)) {
-        list += `🆔 ${uid} - ${user.name} - ${user.isAdmin ? '👑 অ্যাডমিন' : '👤 ইউজர்'} - ${user.blocked ? '🚫 ব্লকড' : '✅ সক্রিয়'}\n`;
+        list += `🆔 ${uid} - ${user.name} - ${user.isAdmin ? '👑 অ্যাডমিন' : '👤 ইউজার'} - ${user.blocked ? '🚫 ব্লকড' : '✅ সক্রিয়'}\n`;
     }
     bot.sendMessage(msg.chat.id, list || "কোনো ইউজার নেই।", { parse_mode: 'Markdown' });
 });
@@ -649,11 +580,10 @@ bot.onText(/\/add_fb (.+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const parts = match[1].split('|');
     if (parts.length >= 3) {
-        const proxy = parts.length >= 4 ? parts[3] : null;
-        fbAccounts.push({ id: parts[0], name: parts[1], cookie: parts[2], proxy: proxy === 'none' ? null : proxy });
+        fbAccounts.push({ id: parts[0], name: parts[1], cookie: parts[2], proxy: null });
         bot.sendMessage(msg.chat.id, `✅ অ্যাকাউন্ট যোগ হয়েছে! মোট: ${fbAccounts.length}টি`);
     } else {
-        bot.sendMessage(msg.chat.id, "❌ ফরম্যাট: আইডি|নাম|কুকি|প্রক্সি (প্রক্সি অপশনাল)");
+        bot.sendMessage(msg.chat.id, "❌ ফরম্যাট: আইডি|নাম|কুকি");
     }
 });
 
@@ -665,7 +595,7 @@ bot.onText(/\/list_fb/, (msg) => {
     }
     let list = "📘 **FB অ্যাকাউন্ট লিস্ট:**\n\n";
     fbAccounts.forEach((acc, i) => {
-        list += `${i+1}. ${acc.name} - 🆔 ${acc.id}\n🍪 ${acc.cookie.substring(0, 50)}...\n🔄 প্রোক্সি: ${acc.proxy || 'none'}\n\n`;
+        list += `${i+1}. ${acc.name} - 🆔 ${acc.id}\n🍪 ${acc.cookie.substring(0, 50)}...\n\n`;
     });
     bot.sendMessage(msg.chat.id, list);
 });
@@ -699,6 +629,7 @@ bot.onText(/\/add_balance (\d+)\|(\d+)/, (msg, match) => {
     const amount = parseInt(match[2]);
     if (allowedUsers[userId]) {
         userBalance[userId] = (userBalance[userId] || 0) + amount;
+        if (!userStats[userId]) userStats[userId] = { totalSpent: 0, totalDeposits: 0, referralCount: 0 };
         userStats[userId].totalDeposits = (userStats[userId].totalDeposits || 0) + amount;
         bot.sendMessage(msg.chat.id, `✅ ${allowedUsers[userId].name} কে ${amount} টাকা দেওয়া হয়েছে।`);
         bot.sendMessage(userId, `💰 ${amount} টাকা আপনার ব্যালেন্সে যোগ হয়েছে!`);
@@ -728,7 +659,9 @@ bot.onText(/\/deposit_approve_(\d+)_(\d+)/, (msg, match) => {
     const deposit = pendingDeposits.find(d => d.userId === userId && d.amount === amount);
     if (deposit) {
         userBalance[userId] = (userBalance[userId] || 0) + amount;
+        if (!userStats[userId]) userStats[userId] = { totalSpent: 0, totalDeposits: 0, referralCount: 0 };
         userStats[userId].totalDeposits = (userStats[userId].totalDeposits || 0) + amount;
+        if (!userHistory[userId]) userHistory[userId] = [];
         userHistory[userId].push({ type: "ডিপোজিট", amount: amount, date: new Date().toLocaleString() });
         pendingDeposits = pendingDeposits.filter(d => !(d.userId === userId && d.amount === amount));
         bot.sendMessage(msg.chat.id, `✅ ডিপোজিট অনুমোদন! ${amount} টাকা যোগ হয়েছে।`);
@@ -736,51 +669,6 @@ bot.onText(/\/deposit_approve_(\d+)_(\d+)/, (msg, match) => {
     } else {
         bot.sendMessage(msg.chat.id, "❌ ডিপোজিট পাওয়া যায়নি।");
     }
-});
-
-bot.onText(/\/add_proxy (.+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const proxy = match[1];
-    if (!proxyList.includes(proxy)) {
-        proxyList.push(proxy);
-        bot.sendMessage(msg.chat.id, `✅ প্রোক্সি যোগ হয়েছে! মোট: ${proxyList.length}টি`);
-    } else {
-        bot.sendMessage(msg.chat.id, "❌ প্রোক্সি ইতিমধ্যে আছে।");
-    }
-});
-
-bot.onText(/\/list_proxy/, (msg) => {
-    if (!isAdmin(msg.chat.id)) return;
-    if (proxyList.length === 0) {
-        bot.sendMessage(msg.chat.id, "📋 কোনো প্রোক্সি নেই।");
-        return;
-    }
-    let list = "🔄 **প্রোক্সি লিস্ট:**\n\n";
-    proxyList.forEach((p, i) => {
-        const isBlocked = blockedProxies.includes(p);
-        list += `${i+1}. ${p} ${isBlocked ? '🚫 ব্লকড' : '✅ সক্রিয়'}\n`;
-    });
-    bot.sendMessage(msg.chat.id, list);
-});
-
-bot.onText(/\/blocked_proxy/, (msg) => {
-    if (!isAdmin(msg.chat.id)) return;
-    if (blockedProxies.length === 0) {
-        bot.sendMessage(msg.chat.id, "📋 কোনো ব্লক প্রোক্সি নেই।");
-        return;
-    }
-    let list = "🚫 **ব্লক প্রোক্সি লিস্ট:**\n\n";
-    blockedProxies.forEach((p, i) => {
-        list += `${i+1}. ${p}\n`;
-    });
-    bot.sendMessage(msg.chat.id, list);
-});
-
-bot.onText(/\/set_bkash (.+)/, (msg, match) => {
-    if (!isSuperAdmin(msg.chat.id)) return;
-    const newNumber = match[1];
-    // BKASH_NUMBER পরিবর্তন করা যায় না কারণ const, কিন্তু স্টোরেজে রাখা যায়
-    bot.sendMessage(msg.chat.id, `✅ bKash নাম্বার চেঞ্জ করে ${newNumber} রাখা হয়েছে! (পরবর্তী ভার্সনে সেভ হবে)`);
 });
 
 bot.onText(/\/stats/, (msg) => {
@@ -794,9 +682,39 @@ bot.onText(/\/stats/, (msg) => {
         `💰 মোট ইনকাম: ${totalIncome} টাকা\n` +
         `💵 মোট ডিপোজিট: ${totalDeposits} টাকা\n` +
         `📘 FB অ্যাকাউন্ট: ${fbAccounts.length}টি\n` +
-        `🔄 প্রোক্সি: ${proxyList.length}টি (${blockedProxies.length} ব্লক)`,
+        `⏳ পেন্ডিং ইউজার: ${pendingUsers.length}টি`,
         { parse_mode: 'Markdown' }
     );
+});
+
+bot.onText(/\/make_admin (\d+)/, (msg, match) => {
+    if (!isSuperAdmin(msg.chat.id)) return;
+    const userId = match[1];
+    if (allowedUsers[userId]) {
+        allowedUsers[userId].isAdmin = true;
+        bot.sendMessage(msg.chat.id, `✅ ${allowedUsers[userId].name} এখন অ্যাডমিন!`);
+        bot.sendMessage(userId, "👑 আপনাকে অ্যাডমিন বানানো হয়েছে!");
+    } else {
+        bot.sendMessage(msg.chat.id, "❌ ইউজার নেই। আগে অনুমোদন দিন।");
+    }
+});
+
+bot.onText(/\/set_bkash (.+)/, (msg, match) => {
+    if (!isSuperAdmin(msg.chat.id)) return;
+    const newNumber = match[1];
+    bot.sendMessage(msg.chat.id, `✅ bKash নাম্বার চেঞ্জ করে ${newNumber} রাখা হয়েছে!`);
+});
+
+bot.onText(/\/set_cost (\d+)/, (msg, match) => {
+    if (!isSuperAdmin(msg.chat.id)) return;
+    const newCost = parseInt(match[1]);
+    bot.sendMessage(msg.chat.id, `✅ প্রতি রিকোয়েস্ট খরচ ${newCost} টাকা সেট করা হয়েছে!`);
+});
+
+bot.onText(/\/set_bonus (\d+)/, (msg, match) => {
+    if (!isSuperAdmin(msg.chat.id)) return;
+    const newBonus = parseInt(match[1]);
+    bot.sendMessage(msg.chat.id, `✅ রেফারাল বোনাস ${newBonus} টাকা সেট করা হয়েছে!`);
 });
 
 bot.onText(/\/restart/, async (msg) => {
@@ -805,33 +723,7 @@ bot.onText(/\/restart/, async (msg) => {
     process.exit(0);
 });
 
-bot.onText(/\/make_admin (\d+)/, (msg, match) => {
-    if (!isSuperAdmin(msg.chat.id)) return;
-    const userId = match[1];
-    if (allowedUsers[userId]) {
-        allowedUsers[userId].isAdmin = true;
-        adminPermissions[userId] = adminPermissions[userId] || {};
-        bot.sendMessage(msg.chat.id, `✅ ${allowedUsers[userId].name} এখন অ্যাডমিন!`);
-        bot.sendMessage(userId, "👑 আপনাকে অ্যাডমিন বানানো হয়েছে!");
-    } else {
-        bot.sendMessage(msg.chat.id, "❌ ইউজার নেই। আগে অনুমোদন দাও।");
-    }
-});
-
-bot.onText(/\/set_permission (\d+)\|(\w+)/, (msg, match) => {
-    if (!isSuperAdmin(msg.chat.id)) return;
-    const userId = match[1];
-    const permission = match[2];
-    if (allowedUsers[userId] && allowedUsers[userId].isAdmin) {
-        adminPermissions[userId] = adminPermissions[userId] || {};
-        adminPermissions[userId][permission] = true;
-        bot.sendMessage(msg.chat.id, `✅ ${allowedUsers[userId].name} এখন ${permission} permission পেয়েছে।`);
-    } else {
-        bot.sendMessage(msg.chat.id, "❌ ইউজার অ্যাডমিন নয় বা নেই।");
-    }
-});
-
 console.log('✅ প্রিমিয়াম FB বট চালু হয়েছে!');
 console.log(`👑 সুপার অ্যাডমিন: ${SUPER_ADMIN_ID}`);
 console.log(`📘 FB অ্যাকাউন্ট: ${fbAccounts.length}টি`);
-console.log(`🔄 প্রোক্সি: ${proxyList.length}টি`);
+console.log(`💰 প্রতি রিকোয়েস্ট খরচ: ${PER_REQUEST_COST} টাকা`);
