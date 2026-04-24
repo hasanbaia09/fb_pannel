@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 
 app.get('/', (req, res) => {
-    res.send('🌟 Premium FB Bot is running!');
+    res.send('🌟 Ultimate FB Bot is running!');
 });
 
 app.listen(3000, () => {
@@ -11,7 +11,7 @@ app.listen(3000, () => {
 
 const TelegramBot = require('node-telegram-bot-api');
 
-// ============= কনফিগারেশন (তোমার তথ্য বসানো হয়েছে) =============
+// ============= কনফিগারেশন =============
 const BOT_TOKEN = '8772316564:AAF6Buvm_XAT3QyClTNKp9nVuop2KSVSb0U';
 const SUPER_ADMIN_ID = '7659779887';
 const BKASH_NUMBER = '01865598733';
@@ -30,18 +30,13 @@ let userBalance = {};
 let userStats = {};
 let userHistory = {};
 let pendingDeposits = [];
-let proxyList = [];
-let blockedProxies = [];
-let adminPermissions = {};
 
 // ============= ডিফল্ট FB অ্যাকাউন্ট =============
-const DEFAULT_ACCOUNTS = [
-    { id: "61572065871152", name: "📘 Account 1", cookie: "datr=xxx; c_user=xxx; xs=xxx", proxy: null },
-    { id: "61572102352313", name: "📘 Account 2", cookie: "datr=yyy; c_user=yyy; xs=yyy", proxy: null }
+fbAccounts = [
+    { id: "61572065871152", name: "📘 Account 1", cookie: "datr=xxx; c_user=xxx; xs=xxx" }
 ];
-fbAccounts = [...DEFAULT_ACCOUNTS];
 
-// ============= হেল্পার ফাংশন =============
+// ============= ফাংশন =============
 function randomDelay() {
     return (Math.random() * (7 - 4) + 4) * 1000;
 }
@@ -50,7 +45,7 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function sendFriendRequest(cookie, proxy, targetId) {
+async function sendFriendRequest(cookie, targetId) {
     const url = `https://www.facebook.com/ajax/add_friend/action.php?dpr=1`;
     const params = new URLSearchParams();
     params.append('to_friend', targetId);
@@ -58,7 +53,7 @@ async function sendFriendRequest(cookie, proxy, targetId) {
     params.append('__a', '1');
     
     try {
-        const fetchOptions = {
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Cookie': cookie,
@@ -66,29 +61,11 @@ async function sendFriendRequest(cookie, proxy, targetId) {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36'
             },
             body: params.toString()
-        };
-        
-        const response = await fetch(url, fetchOptions);
+        });
         const text = await response.text();
-        
-        if (response.status === 403 || response.status === 429) {
-            if (proxy) markProxyBlocked(proxy);
-            return false;
-        }
-        
         return text.includes('success') || text.includes('confirm');
     } catch(e) {
-        if (proxy && (e.message.includes('ECONNREFUSED') || e.message.includes('ETIMEDOUT'))) {
-            markProxyBlocked(proxy);
-        }
         return false;
-    }
-}
-
-function markProxyBlocked(proxy) {
-    if (!blockedProxies.includes(proxy)) {
-        blockedProxies.push(proxy);
-        console.log(`🚫 Proxy blocked: ${proxy}`);
     }
 }
 
@@ -102,18 +79,9 @@ function isAdmin(userId) {
     return user && user.isAdmin === true && user.blocked !== true;
 }
 
-function hasPermission(userId, permission) {
-    if (isSuperAdmin(userId)) return true;
-    return adminPermissions[userId] && adminPermissions[userId][permission] === true;
-}
-
 function isAllowed(userId) {
     const user = allowedUsers[userId];
     return user && user.approved === true && user.blocked !== true;
-}
-
-function getReferralLink(userId) {
-    return `https://t.me/${bot.getBotUsername()}?start=ref_${userId}`;
 }
 
 function getUserVisibleAccounts(userId) {
@@ -122,7 +90,11 @@ function getUserVisibleAccounts(userId) {
     return fbAccounts.slice(0, visibleCount);
 }
 
-// ============= মেনু বাটন =============
+function getReferralLink(userId) {
+    return `https://t.me/fbfhelppanel_bot?start=ref_${userId}`;
+}
+
+// ============= মেনু বাটন (নিচের দিকে) =============
 const mainMenu = {
     reply_markup: {
         inline_keyboard: [
@@ -158,7 +130,7 @@ function backButton(data) {
     };
 }
 
-// ============= টেলিগ্রাম কমান্ড =============
+// ============= স্টার্ট কমান্ড =============
 bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
     const userId = chatId.toString();
@@ -340,8 +312,7 @@ bot.on('callback_query', async (query) => {
             bot.answerCallbackQuery(query.id, { text: '❌ আপনার অনুমোদন নেই!', show_alert: true });
             return;
         }
-        const username = msg.from.username || "hasanbaia9";
-        const referralLink = `https://t.me/fbfhelppanel_bot?start=ref_${userId}`;
+        const referralLink = getReferralLink(userId);
         const referralCount = userStats[userId]?.referralCount || 0;
         
         let leaderboard = "🏆 **লিডারবোর্ড** 🏆\n\n";
@@ -449,7 +420,7 @@ bot.on('callback_query', async (query) => {
         let success = 0;
         for (let i = 0; i < visibleAccounts.length; i++) {
             const acc = visibleAccounts[i];
-            const result = await sendFriendRequest(acc.cookie, acc.proxy, targetId);
+            const result = await sendFriendRequest(acc.cookie, targetId);
             if (result) success++;
             bot.sendMessage(chatId, `${result ? '✅' : '❌'} ${acc.name}`);
             if (i < visibleAccounts.length - 1) await sleep(randomDelay());
@@ -580,7 +551,7 @@ bot.onText(/\/add_fb (.+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const parts = match[1].split('|');
     if (parts.length >= 3) {
-        fbAccounts.push({ id: parts[0], name: parts[1], cookie: parts[2], proxy: null });
+        fbAccounts.push({ id: parts[0], name: parts[1], cookie: parts[2] });
         bot.sendMessage(msg.chat.id, `✅ অ্যাকাউন্ট যোগ হয়েছে! মোট: ${fbAccounts.length}টি`);
     } else {
         bot.sendMessage(msg.chat.id, "❌ ফরম্যাট: আইডি|নাম|কুকি");
